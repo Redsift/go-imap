@@ -114,6 +114,8 @@ type Client struct {
 	*debugLog
 }
 
+var commandsConfig = defaultCommands()
+
 // NewClient returns a new Client instance connected to an IMAP server via conn.
 // The function waits for the server to send a greeting message, and then
 // requests server capabilities if they weren't included in the greeting. An
@@ -126,7 +128,7 @@ func NewClient(conn net.Conn, host string, timeout time.Duration) (c *Client, er
 
 	c = &Client{
 		Caps:          make(map[string]bool),
-		CommandConfig: defaultCommands(),
+		CommandConfig: commandsConfig,
 		host:          host,
 		state:         unknown,
 		tag:           *newTagGen(0),
@@ -353,6 +355,32 @@ func (c *Client) receiver(cch <-chan chan<- *response) {
 	}
 }
 
+type timer struct {
+	*time.Timer
+}
+
+func (t *timer) release() {
+	if t == nil {
+		return
+	}
+	go func() {
+		if !t.Stop() {
+			<-t.C
+		}
+		timers.Put(t)
+	}()
+}
+
+var timers = sync.Pool{
+	New: func() interface{} {
+		t := &timer{time.NewTimer(1)}
+		if !t.Stop() {
+			<-t.C
+		}
+		return t
+	},
+}
+
 // recv returns the next server response, updating the client state beforehand.
 func (c *Client) recv(timeout time.Duration) (rsp *Response, err error) {
 	if c.state == Closed {
@@ -376,12 +404,17 @@ func (c *Client) recv(timeout time.Duration) (rsp *Response, err error) {
 					return nil, ErrTimeout
 				}
 				var tch <-chan time.Time
+				var t *timer
 				if timeout > 0 {
-					tch = time.After(timeout)
+					t = timers.Get().(*timer)
+					t.Reset(timeout)
+					tch = t.C
 				}
 				select {
 				case r = <-c.rch:
+					t.release()
 				case err = <-c.ich:
+					t.release()
 					return nil, err
 				case <-tch:
 					return nil, ErrTimeout
