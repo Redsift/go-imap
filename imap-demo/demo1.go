@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mxk/go-imap/imap"
+	"github.com/redsift/go-imap/imap"
 )
 
 const (
