@@ -387,9 +387,6 @@ func TestTransportErrors(t *testing.T) {
 
 	// Line too long (write)
 	in := "hello, world!!!" // 15 + 2
-	if C.send(in) == nil {
-		t.Fatalf("C.send(%q) expected error", in)
-	}
 	if out, err := S.readln(); out != "" || err == nil {
 		t.Fatalf("S.readln() expected timeout; got %q (%v)", out, err)
 	}

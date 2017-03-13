@@ -192,13 +192,6 @@ func (t *transport) WriteLine(line []byte) error {
 		}
 	}
 
-	// Free enough space in the buffer for the entire line
-	if n := len(line) + 2; n > t.buf.Available() && err == nil {
-		if err = t.buf.Flush(); n > t.buf.Available() && err == nil {
-			err = &ProtocolError{"line too long", line}
-		}
-	}
-
 	// Write the line followed by CRLF
 	if err == nil {
 		if _, err = t.buf.Write(line); err == nil {
